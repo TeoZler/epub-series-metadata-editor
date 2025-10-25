@@ -37,17 +37,32 @@ def add_series(root,meta,series,index=None,compat=False):
         m=ET.Element("meta"); m.set("name","calibre:series"); m.set("content",series); meta.append(m)
         if index is not None:
             mi=ET.Element("meta"); mi.set("name","calibre:series_index"); mi.set("content",str(index)); meta.append(mi)
-def write_epub(epub_path,opf_path,new_opf,backup=True):
+def write_epub(epub_path,opf_path,new_opf,backup=True,backup_dir=None,backup_base=None):
     tmp=epub_path+".tmp"
     with zipfile.ZipFile(epub_path,"r") as zr, zipfile.ZipFile(tmp,"w",compression=zipfile.ZIP_DEFLATED) as zw:
         for it in zr.infolist():
             data=zr.read(it.filename)
             if it.filename==opf_path: data=new_opf
             zw.writestr(it,data)
-    if backup: shutil.copy2(epub_path,epub_path+".bak")
+    if backup:
+        dest=epub_path+".bak"
+        if backup_dir:
+            try:
+                base=pathlib.Path(backup_base).resolve() if backup_base else pathlib.Path(epub_path).resolve().parent
+            except Exception:
+                base=pathlib.Path(epub_path).resolve().parent
+            p_epub=pathlib.Path(epub_path).resolve()
+            try:
+                rel=p_epub.relative_to(base)
+            except Exception:
+                rel=p_epub.name
+            dest_path=pathlib.Path(backup_dir).resolve()/rel
+            os.makedirs(str(dest_path.parent),exist_ok=True)
+            dest=str(dest_path)+".bak" if not str(dest_path).endswith(".bak") else str(dest_path)
+        shutil.copy2(epub_path,dest)
     os.replace(tmp,epub_path)
 POLICY_FORCE_ALL=False
-def process_file(path,series=None,index=None,force=False,skip=False,dry=False,compat=False,backup=True):
+def process_file(path,series=None,index=None,force=False,skip=False,dry=False,compat=False,backup=True,backup_dir=None,backup_base=None):
     global POLICY_FORCE_ALL
     with zipfile.ZipFile(path,"r") as z:
         opf=find_opf(z); data=z.read(opf)
@@ -65,7 +80,7 @@ def process_file(path,series=None,index=None,force=False,skip=False,dry=False,co
     add_series(root,meta,val,index,compat)
     new=ET.tostring(root,encoding="utf-8",xml_declaration=True)
     if dry: return f"预览: {path} -> {val}"
-    write_epub(path,opf,new,backup)
+    write_epub(path,opf,new,backup,backup_dir,backup_base)
     return f"完成: {path} -> {val}"
 def find_epubs(p,rec=False):
     p=pathlib.Path(p)
@@ -117,6 +132,18 @@ def interactive():
     mode = ask_choice("遇到已有系列标签 [i=逐本确认,f=直接覆盖,s=跳过] (默认 i): ", {"i","f","s"}, "i")
     dry = ask_yn("仅预览不更改文件?", default=False)
     backup = ask_yn("生成.bak备份?", default=True)
+    # 新增：备份路径选择与基准路径确定
+    backup_dir = None
+    base_for_backup = str(pathlib.Path(path).resolve()) if pathlib.Path(path).is_dir() else str(pathlib.Path(path).resolve().parent)
+    if backup:
+        bsel = ask_choice("备份位置 [1=原文件夹,2=指定路径] (默认 1): ", {"1","2"}, "1")
+        if bsel == "2":
+            backup_dir = input("备份根路径: ").strip()
+            if not backup_dir:
+                print("提示：未输入路径，改为原文件夹备份。")
+                backup_dir = None
+            else:
+                print(f"备份将保存到: {backup_dir}，并保留相对结构自: {base_for_backup}")
     files=find_epubs(path,rec)
     if not files:
         print("未找到EPUB文件"); return
@@ -163,11 +190,11 @@ def interactive():
                 for f in flist:
                     try:
                         if mode=='f':
-                            res=process_file(f,ser,index,force=True,skip=False,dry=dry,compat=compat,backup=backup)
+                            res=process_file(f,ser,index,force=True,skip=False,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                         elif mode=='s':
-                            res=process_file(f,ser,index,force=False,skip=True,dry=dry,compat=compat,backup=backup)
+                            res=process_file(f,ser,index,force=False,skip=True,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                         else:
-                            res=process_file(f,ser,index,force=False,skip=False,dry=dry,compat=compat,backup=backup)
+                            res=process_file(f,ser,index,force=False,skip=False,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                         print(res)
                         if res.startswith("完成"): ok+=1
                         elif res.startswith("跳过"): skip+=1
@@ -180,11 +207,11 @@ def interactive():
                     ser_each = input(f"文件: {fname} 系列名(留空用父目录'{dname}'):").strip() or dname
                     try:
                         if mode=='f':
-                            res=process_file(f,ser_each,index,force=True,skip=False,dry=dry,compat=compat,backup=backup)
+                            res=process_file(f,ser_each,index,force=True,skip=False,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                         elif mode=='s':
-                            res=process_file(f,ser_each,index,force=False,skip=True,dry=dry,compat=compat,backup=backup)
+                            res=process_file(f,ser_each,index,force=False,skip=True,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                         else:
-                            res=process_file(f,ser_each,index,force=False,skip=False,dry=dry,compat=compat,backup=backup)
+                            res=process_file(f,ser_each,index,force=False,skip=False,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                         print(res)
                         if res.startswith("完成"): ok+=1
                         elif res.startswith("跳过"): skip+=1
@@ -196,11 +223,11 @@ def interactive():
                     try:
                         ser_d=dname
                         if mode=='f':
-                            res=process_file(f,ser_d,index,force=True,skip=False,dry=dry,compat=compat,backup=backup)
+                            res=process_file(f,ser_d,index,force=True,skip=False,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                         elif mode=='s':
-                            res=process_file(f,ser_d,index,force=False,skip=True,dry=dry,compat=compat,backup=backup)
+                            res=process_file(f,ser_d,index,force=False,skip=True,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                         else:
-                            res=process_file(f,ser_d,index,force=False,skip=False,dry=dry,compat=compat,backup=backup)
+                            res=process_file(f,ser_d,index,force=False,skip=False,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                         print(res)
                         if res.startswith("完成"): ok+=1
                         elif res.startswith("跳过"): skip+=1
@@ -217,11 +244,11 @@ def interactive():
         for f in files:
             try:
                 if mode=='f':
-                    res=process_file(f,series,index,force=True,skip=False,dry=dry,compat=compat,backup=backup)
+                    res=process_file(f,series,index,force=True,skip=False,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                 elif mode=='s':
-                    res=process_file(f,series,index,force=False,skip=True,dry=dry,compat=compat,backup=backup)
+                    res=process_file(f,series,index,force=False,skip=True,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                 else:
-                    res=process_file(f,series,index,force=False,skip=False,dry=dry,compat=compat,backup=backup)
+                    res=process_file(f,series,index,force=False,skip=False,dry=dry,compat=compat,backup=backup,backup_dir=backup_dir,backup_base=base_for_backup)
                 print(res)
                 if res.startswith("完成"): ok+=1
                 elif res.startswith("跳过"): skip+=1
@@ -244,6 +271,8 @@ def main():
     ap.add_argument("--no-backup",action="store_true",help="不生成.bak备份")
     ap.add_argument("--compat-meta",action="store_true",help="同时写入<meta name='calibre:series'>")
     ap.add_argument("--interactive","-i",action="store_true",help="进入交互模式")
+    ap.add_argument("--backup-dir",help="将.bak备份保存到指定路径，并保留相对结构")
+    ap.add_argument("--backup-base",help="备份相对结构的基准路径(默认为--path或文件的父目录)")
     args=ap.parse_args()
     if args.interactive:
         interactive(); return
@@ -252,9 +281,10 @@ def main():
         print("未找到EPUB文件"); return
     print(f"待处理 {len(files)} 个EPUB")
     ok=skip=err=0
+    base_for_backup = args.backup_base or (args.path if pathlib.Path(args.path).is_dir() else str(pathlib.Path(args.path).parent))
     for f in files:
         try:
-            res=process_file(f,args.series,args.index,args.force,args.skip_existing,args.dry_run,args.compat_meta,not args.no_backup)
+            res=process_file(f,args.series,args.index,args.force,args.skip_existing,args.dry_run,args.compat_meta,backup=not args.no_backup,backup_dir=args.backup_dir,backup_base=base_for_backup)
             print(res)
             if res.startswith("完成"): ok+=1
             elif res.startswith("跳过"): skip+=1

@@ -49,6 +49,14 @@ python epub_series_editor.py --path "D:\Books" --recursive --dry-run
 python epub_series_editor.py --path "D:\Books\A" --series "My Series" --index 1 --compat-meta
 ```
 
+- 备份保存到自定义路径并保留相对结构：
+```powershell
+# 假设原始根路径为 C:\Users\Wen_He\Desktop\epub-series-metadata-editor\test_books
+python epub_series_editor.py --path "C:\Users\Wen_He\Desktop\epub-series-metadata-editor\test_books" --recursive --backup-dir "C:\bak"
+# 示例：原文件位于 ...\test_books\狼与辛香料\狼与辛香料 I.epub
+# 生成的备份将位于 C:\bak\狼与辛香料\狼与辛香料 I.epub.bak
+```
+
 ## 说明
 - 解析`META-INF/container.xml`确定OPF路径；找不到则回退扫描`.opf`。
 - 写入时确保根元素有`xmlns:calibre`，插入`<calibre:series>`（可选写入`<meta name="calibre:series">`）。
@@ -65,9 +73,12 @@ python epub_series_editor.py --path "D:\Books\A" --series "My Series" --index 1 
 - `--no-backup` 不生成 `.bak` 备份
 - `--compat-meta` 同时写入兼容 `<meta name="calibre:series" content="...">`
 - `--interactive`, `-i` 进入交互模式（无参数运行也会进入）
+- `--backup-dir` 指定备份根路径；`.bak` 按原始相对结构保存到该路径
+- `--backup-base` 相对结构的基准路径；默认为 `--path` 或单文件的父目录
 
 交互中的选择补充：
 - 遇到已有标签时：`y/N/a/skip` 分别为替换/不替换/全部替换/跳过当前文件。
+- 备份位置：`1` 原文件夹；`2` 指定路径（会显示相对结构基准路径）。
 - 文件夹策略：`d` 使用父目录名；`c` 统一自定义；`i` 逐本确认；`s` 跳过。
 - 快捷应用到后续文件夹：在上述选择后加 `a`，例如 `da/ca/ia/sa`。
 
