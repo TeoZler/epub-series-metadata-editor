@@ -121,26 +121,112 @@ def interactive():
     if not files:
         print("未找到EPUB文件"); return
     print(f"发现 {len(files)} 个EPUB")
-    print(f"系列名：{'每本父文件夹名' if not series else series}")
-    if index is not None: print(f"系列序号：{index}")
-    print(f"处理模式：{('覆盖' if mode=='f' else '跳过' if mode=='s' else '逐本确认')}, 递归：{rec}, 预览：{dry}, 备份：{backup}, 兼容meta：{compat}")
-    go=ask_yn("开始执行?", default=True)
-    if not go:
-        print("已取消"); return
+    by_folder = ask_yn("是否按末级文件夹逐个确认系列策略?", default=True)
     ok=skip=err=0
-    for f in files:
-        try:
-            if mode=='f':
-                res=process_file(f,series,index,force=True,skip=False,dry=dry,compat=compat,backup=backup)
-            elif mode=='s':
-                res=process_file(f,series,index,force=False,skip=True,dry=dry,compat=compat,backup=backup)
+    if by_folder:
+        # 按父目录分组逐个决策
+        groups = {}
+        for f in sorted(files):
+            d=str(pathlib.Path(f).parent)
+            groups.setdefault(d, []).append(f)
+        # 增加快速选项：da/ca/ia/sa 表示将当前选择应用到后续所有文件夹
+        apply_to_all = False
+        global_choice = None  # "d"/"c"/"i"/"s"
+        global_ser = None     # 当 global_choice=="c" 时的统一系列名
+        for d, flist in groups.items():
+            dname = pathlib.Path(d).name
+            print(f"\n文件夹: {d} (共 {len(flist)} 本)")
+            if not apply_to_all:
+                raw = input("选择策略 [d=父目录,c=统一自定义,i=逐本确认,s=跳过]，加a表示应用到后续 (默认 d): ").strip().lower()
+                if not raw:
+                    raw = "d"
+                while raw not in {"d","c","i","s","da","ca","ia","sa"}:
+                    raw = (input("请输入 d/c/i/s 或 da/ca/ia/sa，默认 d: ").strip().lower() or "d")
+                apply_to_all = raw.endswith("a")
+                choice = raw[0]  # 基本策略标记
+                ser = None
+                if apply_to_all:
+                    global_choice = choice
+                if choice == "c":
+                    ser = input(f"输入该文件夹统一系列名(留空则使用'{dname}'):").strip() or dname
+                    if apply_to_all:
+                        global_ser = ser
             else:
-                res=process_file(f,series,index,force=False,skip=False,dry=dry,compat=compat,backup=backup)
-            print(res)
-            if res.startswith("完成"): ok+=1
-            elif res.startswith("跳过"): skip+=1
-        except Exception as e:
-            err+=1; print(f"错误: {f}: {e}")
+                choice = global_choice
+                ser = global_ser if choice == "c" else None
+            if choice == "s":
+                print(f"跳过文件夹: {d}")
+                skip += len(flist)
+                continue
+            if choice == "c":
+                # 使用统一的系列名 ser
+                for f in flist:
+                    try:
+                        if mode=='f':
+                            res=process_file(f,ser,index,force=True,skip=False,dry=dry,compat=compat,backup=backup)
+                        elif mode=='s':
+                            res=process_file(f,ser,index,force=False,skip=True,dry=dry,compat=compat,backup=backup)
+                        else:
+                            res=process_file(f,ser,index,force=False,skip=False,dry=dry,compat=compat,backup=backup)
+                        print(res)
+                        if res.startswith("完成"): ok+=1
+                        elif res.startswith("跳过"): skip+=1
+                    except Exception as e:
+                        err+=1; print(f"错误: {f}: {e}")
+            elif choice == "i":
+                # 逐本确认系列名
+                for f in flist:
+                    fname = pathlib.Path(f).name
+                    ser_each = input(f"文件: {fname} 系列名(留空用父目录'{dname}'):").strip() or dname
+                    try:
+                        if mode=='f':
+                            res=process_file(f,ser_each,index,force=True,skip=False,dry=dry,compat=compat,backup=backup)
+                        elif mode=='s':
+                            res=process_file(f,ser_each,index,force=False,skip=True,dry=dry,compat=compat,backup=backup)
+                        else:
+                            res=process_file(f,ser_each,index,force=False,skip=False,dry=dry,compat=compat,backup=backup)
+                        print(res)
+                        if res.startswith("完成"): ok+=1
+                        elif res.startswith("跳过"): skip+=1
+                    except Exception as e:
+                        err+=1; print(f"错误: {f}: {e}")
+            else:
+                # d = 使用父目录名
+                for f in flist:
+                    try:
+                        ser_d=dname
+                        if mode=='f':
+                            res=process_file(f,ser_d,index,force=True,skip=False,dry=dry,compat=compat,backup=backup)
+                        elif mode=='s':
+                            res=process_file(f,ser_d,index,force=False,skip=True,dry=dry,compat=compat,backup=backup)
+                        else:
+                            res=process_file(f,ser_d,index,force=False,skip=False,dry=dry,compat=compat,backup=backup)
+                        print(res)
+                        if res.startswith("完成"): ok+=1
+                        elif res.startswith("跳过"): skip+=1
+                    except Exception as e:
+                        err+=1; print(f"错误: {f}: {e}")
+    else:
+        # 原有全局系列逻辑
+        print(f"系列名：{'每本父文件夹名' if not series else series}")
+        if index is not None: print(f"系列序号：{index}")
+        print(f"处理模式：{('覆盖' if mode=='f' else '跳过' if mode=='s' else '逐本确认')}, 递归：{rec}, 预览：{dry}, 备份：{backup}, 兼容meta：{compat}")
+        go=ask_yn("开始执行?", default=True)
+        if not go:
+            print("已取消"); return
+        for f in files:
+            try:
+                if mode=='f':
+                    res=process_file(f,series,index,force=True,skip=False,dry=dry,compat=compat,backup=backup)
+                elif mode=='s':
+                    res=process_file(f,series,index,force=False,skip=True,dry=dry,compat=compat,backup=backup)
+                else:
+                    res=process_file(f,series,index,force=False,skip=False,dry=dry,compat=compat,backup=backup)
+                print(res)
+                if res.startswith("完成"): ok+=1
+                elif res.startswith("跳过"): skip+=1
+            except Exception as e:
+                err+=1; print(f"错误: {f}: {e}")
     print(f"结果: 成功{ok}, 跳过{skip}, 错误{err}")
 
 def main():
