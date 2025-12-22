@@ -2,8 +2,8 @@ name: Build Binaries
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - '**'
   workflow_dispatch:
 
 jobs:
@@ -37,4 +37,3 @@ jobs:
           path: |
             dist/epub-series-editor*
           if-no-files-found: error
-
