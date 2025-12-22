@@ -1,6 +1,6 @@
 # EPUB Series Metadata Editor
 
-批量为EPUB添加`<meta name="calibre:series" content="..."/>`系列标签，默认取自EPUB所在路径的上一层文件夹名。支持单文件或整个文件夹处理、递归、覆盖策略与预览。可按文件顺序自动写入`<meta name="calibre:series_index" content="..."/>`，并支持交互式排序与修改序号。
+批量为EPUB添加EPUB 3系列标记（`belongs-to-collection`），默认取自EPUB所在路径的上一层文件夹名。支持单文件或整个文件夹处理、递归、覆盖策略与预览。可按文件顺序自动写入`group-position`。亦可按需同时写入`calibre:series`与`calibre:series_index`（可选）。
 
 ## 快速开始
 
@@ -64,7 +64,17 @@ python epub_series_editor.py --path "C:\Users\Wen_He\Desktop\epub-series-metadat
 
 ## 说明
 - 解析`META-INF/container.xml`确定OPF路径；找不到则回退扫描`.opf`。
-- 写入时在`<metadata>`内插入`<meta name="calibre:series" content="..." />`（如指定`--index`或启用自动序号，则插入`<meta name="calibre:series_index" content="..." />`）；不写入`<calibre:series>`元素；不更改其它标签或属性。
+ - 默认在`<metadata>`内插入EPUB 3系列标记：
+   ```
+   <meta property="belongs-to-collection" id="num">系列名</meta>
+   <meta refines="#num" property="collection-type">series</meta>
+   <meta refines="#num" property="group-position">序号</meta>  # 如启用自动序号或指定 --index
+   ```
+ - 如需同时写入Calibre兼容标签，添加`--write-calibre`，将额外插入：
+   ```
+   <meta name="calibre:series" content="系列名" />
+   <meta name="calibre:series_index" content="序号" />
+   ```
 - 使用临时文件重建ZIP以安全替换OPF，防止损坏；默认生成`.bak`备份。
 - 排版：新`<meta>`独立成一行，缩进跟随原文件风格。
 
@@ -82,20 +92,27 @@ python epub_series_editor.py --path "C:\Users\Wen_He\Desktop\epub-series-metadat
 - `--backup-base` 相对结构的基准路径；默认为 `--path` 或单文件的父目录
 - `--auto-index` 按文件顺序自动分配系列序号
 - `--auto-index-start` 自动序号起始值（默认 1）
+- `--write-calibre` 同时写入`calibre:series`与`calibre:series_index`
+- `--no-collection` 不写入EPUB 3的`belongs-to-collection`与`group-position`
 
 交互中的选择补充：
 - 遇到已有标签时：`y/N/a/skip` 分别为替换/不替换/全部替换/跳过当前文件。
 - 备份位置：`1` 原文件夹；`2` 指定路径（会显示相对结构基准路径）。
-- 文件夹策略：`d` 使用父目录名；`c` 统一自定义；`i` 逐本确认；`s` 跳过。
-- 快捷应用到后续文件夹：在上述选择后加 `a`，例如 `da/ca/ia/sa`。
+- 文件夹策略：`d` 使用父目录名；`c` 统一自定义；`i` 逐本确认；`s` 跳过；`e` 优先沿用该文件夹内已有系列（仅为缺失项填充；若文件夹内完全没有已有系列，则回退到 d/c/i/s）
+- 快捷应用到后续文件夹：在上述选择后加 `a`，例如 `da/ca/ia/sa/ea`。
+- 当启用`e`且该文件夹内已有系列不一致时，会显示各系列的数量并提示选择统一来源：`m=出现最多的系列`、`c=手动指定`、`d=父目录名`；随后可选择是否将其他不同系列统一为选定系列。
+ - 写入标签类型（交互模式）：`1` EPUB3系列（`belongs-to-collection`/`group-position`），`2` Calibre系列（`calibre:series`/`calibre:series_index`），`3` 两者都写
 
-交互排序与编号命令：
-- `m i pos` 将第 `i` 项移动到位置 `pos`
-- `s i j` 交换第 `i` 与第 `j` 项
-- `set i N` 将第 `i` 项的序号设为 `N`（支持整数或小数）
-- `start N` 设置起始序号并按当前排序重新编号
-- `auto` 按当前排序从起始序号自动连续编号
-- `done` 完成并继续；`help` 显示帮助与当前列表
+交互排序与编号：
+- 方向键上下：移动光标
+- 回车：切换“拖动/浏览”
+- ESC：完成并退出
+- S：设置起始序号
+- N：为当前项设置自定义序号（支持整数或小数）
+- A：按当前排序从起始序号自动连续编号
+- C：从当前项的序号起，对当前项及之后的项连续编号
+- C 在当前项为小数时：下一项从下一个整数开始（例如当前为 13.5，则下一项为 14）
+- 在支持终端的非Windows平台也可使用上述键盘交互；如终端不支持，将回退到命令模式（`m i pos`、`s i j`、`set i N`、`start N`、`auto`、`c i`）
 
 ## 注意
 - 某些非标准EPUB可能缺失`metadata`段或容器描述，脚本会提示错误并继续处理其它文件。
