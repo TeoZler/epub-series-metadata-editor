@@ -23,7 +23,7 @@ jobs:
       - run: pyinstaller --onefile --name epub-series-editor-linux epub_series_editor.py
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: epub-series-editor-linux
           path: |
@@ -38,7 +38,7 @@ jobs:
           run: pyinstaller --onefile --name epub-series-editor-win epub_series_editor.py
 
       - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: epub-series-editor-windows
           path: |
