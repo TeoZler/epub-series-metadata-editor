@@ -37,3 +37,4 @@ jobs:
           path: |
             dist/epub-series-editor*
           if-no-files-found: error
+
