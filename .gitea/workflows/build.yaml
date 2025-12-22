@@ -34,8 +34,8 @@ jobs:
         uses: addnab/docker-run-action@v3
         with:
           image: cdrx/pyinstaller-windows:python3
-          options: -v ${{ github.workspace }}:/src -v ${{ github.workspace }}/epub_series_editor.py:/src/epub_series_editor.py -w /src
-          run: sh -lc "ls -la /src; pyinstaller --onefile --name epub-series-editor-win /src/epub_series_editor.py"
+          options: -v ${{ github.workspace }}:/src -w /src
+          run: sh -lc "ls -la /src; test -f /src/epub_series_editor.py || (echo 'script not found'; exit 1); pyinstaller --onefile --name epub-series-editor-win epub_series_editor.py"
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v3
