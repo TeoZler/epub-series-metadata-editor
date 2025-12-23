@@ -1,3 +1,4 @@
+# 注意：本项目为纯Vibe Coding AI生成的代码，可能会非常屎山
 # EPUB Series Metadata Editor
 
 批量为EPUB添加EPUB 3系列标记（`belongs-to-collection`），默认取自EPUB所在路径的上一层文件夹名。支持单文件或整个文件夹处理、递归、覆盖策略与预览。可按文件顺序自动写入`group-position`。亦可按需同时写入`calibre:series`与`calibre:series_index`（可选）。
