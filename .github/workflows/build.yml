@@ -96,8 +96,7 @@ jobs:
       - name: Build with PyInstaller (Linux ARM64 Docker)
         if: matrix.target == 'linux-arm64'
         run: |
-          docker run --rm -v ${{ github.workspace }}:/work -w /work --platform linux/arm64 -e HOST_UID=$(id -u) -e HOST_GID=$(id -g) python:3.11-slim /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends binutils && rm -rf /var/lib/apt/lists/* && pip install --no-cache-dir pyinstaller && pyinstaller --onefile --name epub_series_editor epub_series_editor.py && chown -R $HOST_UID:$HOST_GID dist"
-
+          docker run --rm -v ${{ github.workspace }}:/work -w /work --platform linux/arm64 python:3.11-slim /bin/bash -c "apt-get update && apt-get install -y --no-install-recommends binutils && rm -rf /var/lib/apt/lists/* && pip install --no-cache-dir pyinstaller && pyinstaller --onefile --name epub_series_editor epub_series_editor.py && chown -R \$(stat -c '%u:%g' .) dist"
       - name: Rename Artifact
         run: |
           mv ${{ matrix.exe_path }} dist/${{ matrix.artifact_name }}
